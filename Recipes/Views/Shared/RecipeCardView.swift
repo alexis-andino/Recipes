@@ -19,11 +19,9 @@ struct RecipeCardView: View {
             image
             VStack(alignment: .leading) {
                 Text(recipe.name)
-                    .font(.headline)
-                if isFavorite {
-                    Text(recipe.cuisine)
-                        .font(.caption)
-                }
+                    .font(.headline)                
+                Text(recipe.cuisine)
+                    .font(.caption)
             }
             Spacer()
             favoriteButton

@@ -10,7 +10,7 @@ import Foundation
 struct RecipeByCuisine: Equatable {
     let cuisine: String
     let friendlyDisplayName: String
-    let recipes: [Recipe]
+    let recipes: [RecipeViewObject]
 }
 
 extension RecipeByCuisine: Identifiable {

@@ -6,38 +6,75 @@
 //
 
 import Foundation
+import SwiftUI
+import Combine
+
 
 protocol RecipesProvidable {
-    func fetchAllRecipes() async throws -> [Recipe]
-    func fetchFavoriteRecipeIds() -> [String]
-    func saveFavoriteRecipe(_ recipeId: String)
-    func removeFavoriteRecipe(_ recipeId: String)
+    var recipesPublisher: AnyPublisher<[RecipeViewObject], Never> { get async }
+    func refreshRecipes() async throws
+    func favorite(recipe: Recipe) async
+    func unfavorite(recipe: Recipe) async
 }
 
-final class RecipesProvider: RecipesProvidable {
+actor RecipesProvider: RecipesProvidable {
+
+    private(set) var recipes: [RecipeViewObject] = []
     
-    private let networkService: NetworkService
-    private let userDefaults = UserDefaults.standard
-    private let favoritesKey = "favorites"
+    private let recipesService: any RecipesServiceable
+    private let favoritesStore: any FavoriteRecipesStorable
     
-    init() {
-        self.networkService = .init(baseUrl: "d3jbb8n5wk0qxi.cloudfront.net",
-                                    session: .shared,
-                                    decodingStrategy: .convertFromSnakeCase)
+    private var recipesSubject = CurrentValueSubject<[RecipeViewObject], Never>([])
+    
+    var recipesPublisher: AnyPublisher<[RecipeViewObject], Never> {
+        return recipesSubject.eraseToAnyPublisher()
     }
     
-    func fetchAllRecipes() async throws -> [Recipe] {
-        let request = RecipesRequest.fetchAllRecipes
-        try await Task.sleep(for: .seconds(2)) //simulate a slow network to see loading state
-        let response: AllRecipesResponse = try await networkService.fetch(request: request)
-        return response.recipes
+    init(recipesService: any RecipesServiceable, favoritesStore: any FavoriteRecipesStorable) {
+        self.recipesService = recipesService
+        self.favoritesStore = favoritesStore
     }
     
-    func fetchFavoriteRecipeIds() -> [String] {
-        userDefaults.array(forKey: favoritesKey) as? [String] ?? []
+    func refreshRecipes() async throws {
+        let newRecipes = try await recipesService.fetchAllRecipes()
+        var updatedRecipes: [RecipeViewObject] = []
+        
+        let savedFavoriteIds = Set(fetchFavoriteRecipeIds())
+
+        for recipe in newRecipes {
+            updatedRecipes.append(.init(recipe: recipe, isFavorite: savedFavoriteIds.contains(recipe.id)))
+        }
+        
+        recipes = updatedRecipes
+        
+        recipesSubject.send(recipes)
     }
     
-    func saveFavoriteRecipe(_ recipeId: String) {
+    func favorite(recipe: Recipe) {
+        saveFavoriteRecipe(recipe.id)
+        
+        guard let index = recipes.firstIndex(where: { $0.recipe.id == recipe.id }) else { return }
+        
+        recipes[index] = .init(recipe: recipe, isFavorite: true)
+                
+        recipesSubject.send(recipes)
+    }
+    
+    func unfavorite(recipe: Recipe) {
+        removeFavoriteRecipe(recipe.id)
+        
+        guard let index = recipes.firstIndex(where: { $0.recipe.id == recipe.id }) else { return }
+        
+        recipes[index] = .init(recipe: recipe, isFavorite: false)
+                
+        recipesSubject.send(recipes)
+    }
+    
+    private func fetchFavoriteRecipeIds() -> [String] {
+        favoritesStore.retrieveFavorites()
+    }
+    
+    private func saveFavoriteRecipe(_ recipeId: String) {
         var currentFavorites = fetchFavoriteRecipeIds()
         
         guard currentFavorites.first(where: { $0 == recipeId}) == nil else {
@@ -45,13 +82,14 @@ final class RecipesProvider: RecipesProvidable {
         }
         
         currentFavorites.append(recipeId)
-        
-        userDefaults.set(currentFavorites, forKey: favoritesKey)
+                
+        favoritesStore.storeFavorites(currentFavorites)
     }
     
-    func removeFavoriteRecipe(_ recipeId: String) {
+    private func removeFavoriteRecipe(_ recipeId: String) {
         var favorites = fetchFavoriteRecipeIds()
         favorites.removeAll(where: { $0 == recipeId} )
-        userDefaults.set(favorites, forKey: favoritesKey)
+        favoritesStore.storeFavorites(favorites)
     }
 }
+

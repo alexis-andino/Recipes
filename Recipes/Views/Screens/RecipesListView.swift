@@ -11,15 +11,12 @@ struct RecipesListView: View {
     
     @StateObject private var viewModel: RecipesListViewModel
     
-    //Used to track transitions between lists
-    @Namespace private var animationNamespace
-    
     let recipeImageService: any RecipeImageServiceable
     
-    init(recipesService: any RecipesProvidable,
+    init(recipesProvider: any RecipesProvidable,
          recipeImageService: any RecipeImageServiceable,
          emojiFlagService: any EmojiFlagProvidable) {
-        _viewModel = .init(wrappedValue: .init(recipesService: recipesService,
+        _viewModel = .init(wrappedValue: .init(recipesProvider: recipesProvider,
                                                emojiFlagService: emojiFlagService))
         self.recipeImageService = recipeImageService
     }
@@ -29,46 +26,30 @@ struct RecipesListView: View {
             switch viewModel.listState {
             case .uninitialized, .empty:
                 emptyListView
+            case .loaded:
+                listView
             case .error:
                 errorView
             case .loading:
                 loadingView
-            case .loaded:
-                listView
             }
         }
-        .task {
-            await viewModel.refreshAllRecipes()
-        }
         .animation(.default, value: viewModel.listState)
-        .navigationBarTitleDisplayMode(.inline)
-        .background(Color(red: 255/255, green: 235/255, blue: 153/255).gradient)
-        .preferredColorScheme(.light)
+        .navigationTitle(Constants.navigationTitle)
+        .background(Color("MainBackgroundColor").gradient)
     }
     
     private var listView: some View {
         ScrollView {
-            VStack(spacing: 32) {
-                favoriteRecipesSection
-                allRecipesSection
+            VStack {
+                allRecipesList
             }
             .padding()
         }
         .refreshable {
             await viewModel.refreshAllRecipes()
         }
-        .animation(.default, value: viewModel.favoriteRecipes)
         .animation(.default, value: viewModel.allRecipes)
-    }
-    
-    @ViewBuilder
-    private var allRecipesSection: some View {
-        VStack(alignment: .leading) {
-            Text(Constants.allRecipesSectionTitle)
-                .font(.title)
-                .fontWeight(.bold)
-            allRecipesList
-        }
     }
     
     @ViewBuilder
@@ -79,48 +60,11 @@ struct RecipesListView: View {
                     .font(.title3)
                     .fontWeight(.medium)
                 ForEach(cuisine.recipes) { recipe in
-                    recipeCardView(forRecipe: recipe, isFavorite: false)
+                    recipeCardView(forRecipe: recipe)
                 }
             }
             .cardBackgroundDecoration(usingMaterial: .thinMaterial)
         }
-    }
-    
-    @ViewBuilder
-    private var favoriteRecipesSection: some View {
-        VStack(alignment: .leading) {
-            Text(Constants.favoriteRecipesSectionTitle)
-                .font(.title)
-                .fontWeight(.bold)
-            
-            VStack {
-                if viewModel.favoriteRecipes.isEmpty {
-                    favoritesEmptyView
-                } else {
-                    favoriteRecipesList
-                }
-            }
-            .cardBackgroundDecoration(usingMaterial: .thinMaterial)
-        }
-    }
-    
-    @ViewBuilder
-    private var favoriteRecipesList: some View {
-        ForEach(viewModel.favoriteRecipes) { recipe in
-            recipeCardView(forRecipe: recipe, isFavorite: true)
-        }
-    }
-    
-    private var favoritesEmptyView: some View {
-        VStack(spacing: 16) {
-            Text(Constants.noFavoritesText)
-                .font(.headline)
-            Text(Constants.noFavoritesSubtitle)
-                .font(.caption)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .foregroundStyle(.secondary)
     }
     
     private var emptyListView: some View {
@@ -144,27 +88,27 @@ struct RecipesListView: View {
             .foregroundStyle(Color.accentColor)
     }
     
-    private func recipeCardView(forRecipe recipe: Recipe, isFavorite: Bool) -> some View {
+    private func recipeCardView(forRecipe recipe: RecipeViewObject) -> some View {
         NavigationLink(destination: {
-            RecipeDetailsView(recipe: recipe)
+            RecipeDetailsView(recipe: recipe.recipe)
         }, label: {
-            RecipeCardView(recipe: recipe,
-                           isFavorite: isFavorite,
+            RecipeCardView(recipe: recipe.recipe,
+                           isFavorite: recipe.isFavorite,
                            recipeImageService: recipeImageService,
                            favoriteAction: {
-                if isFavorite {
-                    viewModel.unfavorite(recipe)
+                if recipe.isFavorite {
+                    viewModel.unfavorite(recipe.recipe)
                 } else {
-                    viewModel.favorite(recipe)
+                    viewModel.favorite(recipe.recipe)
                 }
             })
         })
-        .matchedGeometryEffect(id: recipe.id, in: animationNamespace)
     }
 }
 
 #Preview {
-    RecipesListView(recipesService: RecipesProvider(),
+    RecipesListView(recipesProvider: RecipesProvider(recipesService: RecipesService(),
+                                                    favoritesStore: UserDefaultsFavoriteRecipesStore()),
                     recipeImageService: RecipeImageService.shared,
                     emojiFlagService: EmojiFlagProvider())
 }
@@ -174,10 +118,7 @@ fileprivate enum Constants {
     static let refreshButtonTitle = "Refresh"
     static let errorOccurredText = "An error occurred"
     static let tryAgainButtonTitle = "Try again"
-    static let noFavoritesText = "No favorite recipes yet!"
-    static let noFavoritesSubtitle = "Try tapping on one of the 🥕 and see what happens!"
-    static let allRecipesSectionTitle = "All Recipes"
-    static let favoriteRecipesSectionTitle = "Favorite Recipes"
+    static let navigationTitle = "All Recipes"
 }
 
 

@@ -10,19 +10,16 @@ import SwiftUI
 @main
 struct RecipesApp: App {
     
-    let recipesService = RecipesProvider()
+    let recipesProvider = RecipesProvider(recipesService: RecipesService(),
+                                         favoritesStore: UserDefaultsFavoriteRecipesStore())
     let imageService = RecipeImageService.shared
     let emojiFlagService = EmojiFlagProvider()
     
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                RecipesListView(recipesService: recipesService,
-                                recipeImageService: imageService,
-                                emojiFlagService: emojiFlagService)
-            }
-            
-            .tint(Color(red: 77/255, green: 182/255, blue: 172/255))
+            MainTabView(recipeProvider: recipesProvider,
+                        recipeImageService: imageService,
+                        emojiFlagService: emojiFlagService)
         }
     }
 }

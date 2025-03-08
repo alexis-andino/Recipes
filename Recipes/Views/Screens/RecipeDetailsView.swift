@@ -43,6 +43,7 @@ struct RecipeDetailsView: View {
                     loadingIndicator
                 }
             }
+            .animation(.default, value: viewState)
     }
     
     private var errorView: some View {

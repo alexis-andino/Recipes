@@ -1,4 +1,12 @@
 //
+//  FavoriteRecipesViewModelTests.swift
+//  Recipes
+//
+//  Created by Alexis Andino on 3/7/25.
+//
+
+
+//
 //  RecipesListViewModelTests.swift
 //  RecipesTests
 //
@@ -9,9 +17,9 @@ import XCTest
 import Combine
 @testable import Recipes
 
-final class RecipesListViewModelTests: XCTestCase {
+final class FavoriteRecipesViewModelTests: XCTestCase {
     
-    var viewModel: RecipesListViewModel!
+    var viewModel: FavoriteRecipesViewModel!
     
     var favoritesStore: MockFavoritesStore!
     var recipesService: MockRecipesService!
@@ -24,8 +32,7 @@ final class RecipesListViewModelTests: XCTestCase {
         favoritesStore = MockFavoritesStore()
         recipesProvider = RecipesProvider(recipesService: recipesService,
                                           favoritesStore: favoritesStore)
-        viewModel = .init(recipesProvider: recipesProvider,
-                          emojiFlagService: EmojiFlagProvider())
+        viewModel = .init(recipeProvider: recipesProvider)
         try super.setUpWithError()
     }
     
@@ -36,58 +43,26 @@ final class RecipesListViewModelTests: XCTestCase {
         viewModel = nil
     }
     
-    func testSuccessfulLoad() async throws {
-        recipesService.recipes = [
-            .init(cuisine: "American",
-                  name: "Banana Pancakes",
-                  uuid: "1",
-                  photoUrlLarge: nil,
-                  photoUrlSmall: nil,
-                  sourceUrl: nil,
-                  youtubeUrl: nil)
-        ]
-        recipesService.throwError = false
-        
-        await viewModel.refreshAllRecipes()
-        
-        XCTAssertEqual(viewModel.listState, .loaded)
-    }
-    
-    func testErrorLoad() async throws {
-        recipesService.throwError = true
-        await viewModel.refreshAllRecipes()
-        XCTAssertEqual(viewModel.listState, .error)
-    }
-    
-    func testEmptyLoad() async throws {
-        recipesService.throwError = false
-        recipesService.recipes = []
-        await viewModel.refreshAllRecipes()
-        XCTAssertEqual(viewModel.listState, .empty)
-    }
-    
-    func testCategorization() async throws {
-        recipesService.throwError = false
+    func testInitialLoadWithExistingFavorite() async throws {
         recipesService.recipes = getMockRecipes()
+        recipesService.throwError = false
+        favoritesStore.storeFavorites(["1", "5"])
+                        
+        let expectation = XCTestExpectation(description: "Favorite recipes should update")
         
-        let expectation = XCTestExpectation(description: "All recipes should be updated")
-        
-        viewModel.$allRecipes
-            .filter { !$0.isEmpty }
-            .sink { newValue in
+        viewModel.$favoriteRecipes
+            .dropFirst()
+            .sink { _ in
                 expectation.fulfill()
-            }
-            .store(in: &cancellables)
+            }.store(in: &cancellables)
         
-        await viewModel.refreshAllRecipes()
+        try await recipesProvider.refreshRecipes()
         
         await fulfillment(of: [expectation], timeout: 2.0)
         
-        XCTAssertEqual(viewModel.allRecipes.count, 3)
-        XCTAssertEqual(viewModel.allRecipes[0].recipes.count, 3)
-        XCTAssertEqual(viewModel.allRecipes[1].recipes.count, 1)
-        XCTAssertEqual(viewModel.allRecipes[2].recipes.count, 1)
+        XCTAssertEqual(viewModel.favoriteRecipes.count, 2)
     }
+    
     
     private func getMockRecipes() -> [Recipe] {
         [
