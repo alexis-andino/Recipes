@@ -5,6 +5,10 @@ This is a demo recipes app. The main features are:
 2. Allows the user to pin recipes as favorites
 3. Alllows the user to navigate to the web page for a particular recipe
 4. The favorites are persisted to disk via User Defaults
+   
+![Simulator Screenshot - iPhone 16 - 2025-03-07 at 23 17 05](https://github.com/user-attachments/assets/d9f9e8bd-4d68-48ed-9d02-3e3acbceea22)
+![Simulator Screenshot - iPhone 16 - 2025-03-07 at 23 17 16](https://github.com/user-attachments/assets/d0ebd7d7-45e3-478b-9235-eb7a453d3d01)
+
 
 ### Focus Areas: What specific areas of the project did you prioritize? Why did you choose to focus on these areas?
 - General polish and user friendliness, since this is something that I'm very passionate about
